@@ -18,6 +18,7 @@ const Version = 2
 const (
 	RuntimeClaudeDesktop = "claudeDesktop"
 	RuntimeCodexApp      = "codexApp"
+	RuntimeDeepSeekHarness = "deepseekHarness"
 	RuntimeAgentManager  = "agentManager"
 )
 
@@ -186,6 +187,7 @@ type Demail struct {
 type Runtimes struct {
 	ClaudeDesktop ClaudeDesktopRuntime `yaml:"claudeDesktop,omitempty"`
 	CodexApp      CodexAppRuntime      `yaml:"codexApp,omitempty"`
+	DeepSeekHarness DeepSeekHarnessRuntime `yaml:"deepseekHarness,omitempty"`
 	AgentManager  AgentManagerRuntime  `yaml:"agentManager,omitempty"`
 }
 
@@ -200,6 +202,19 @@ type CodexAppRuntime struct {
 	// Codex is the codex executable. Default: `codex` on PATH.
 	Codex                  string `yaml:"codex,omitempty"`
 	DeliveryTimeoutSeconds int    `yaml:"deliveryTimeoutSeconds,omitempty"`
+}
+
+// DeepSeekHarnessRuntime delivers to the active DeepSeek Harness Desktop
+// composer through its locally exposed Chromium DevTools endpoint. The app
+// must be launched with a loopback remote-debugging port; FractalBot never
+// enables remote debugging itself.
+type DeepSeekHarnessRuntime struct {
+	// CDPEndpoint is the local Chromium DevTools endpoint, for example
+	// http://127.0.0.1:9224.
+	CDPEndpoint string `yaml:"cdpEndpoint,omitempty"`
+	// TargetSelector optionally matches the DeepSeek Harness page title or URL.
+	TargetSelector string `yaml:"targetSelector,omitempty"`
+	DeliveryTimeoutSeconds int `yaml:"deliveryTimeoutSeconds,omitempty"`
 }
 
 // AgentManagerRuntime assigns to tmux agents through agent-manager.

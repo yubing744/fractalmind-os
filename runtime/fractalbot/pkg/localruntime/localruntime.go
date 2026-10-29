@@ -4,9 +4,11 @@
 // behavior from declared facts instead of runtime names.
 //
 // Runtimes: Claude Desktop (a durable per-agent inbox consumed by a relay in
-// the agent's session), Codex App (the native queue of a pinned thread) and
-// agent-manager (tmux agents). The inbox layout is the versioned on-disk
-// protocol in docs/inbox-protocol.md, so any process can produce or consume it.
+// the agent's session), Codex App (the native queue of a pinned thread),
+// DeepSeek Harness Desktop (its active composer through an explicitly enabled
+// local CDP endpoint) and agent-manager (tmux agents). The inbox layout is the
+// versioned on-disk protocol in docs/inbox-protocol.md, so any process can
+// produce or consume it.
 //
 // This package is an application-layer library. FractalBot embeds it; it does
 // not depend on FractalBot's configuration.

@@ -105,6 +105,11 @@ func DefaultAdapters(cfg *configv2.Config) map[string]localruntime.Adapter {
 			Codex:   cfg.Runtimes.CodexApp.Codex,
 			Timeout: seconds(cfg.Runtimes.CodexApp.DeliveryTimeoutSeconds),
 		},
+		configv2.RuntimeDeepSeekHarness: localruntime.DeepSeekHarness{
+			CDPEndpoint:    cfg.Runtimes.DeepSeekHarness.CDPEndpoint,
+			TargetSelector: cfg.Runtimes.DeepSeekHarness.TargetSelector,
+			Timeout:        seconds(cfg.Runtimes.DeepSeekHarness.DeliveryTimeoutSeconds),
+		},
 		configv2.RuntimeAgentManager: localruntime.AgentManager{
 			Script: func(t localruntime.Target) string {
 				return cfg.AgentManagerScript(configv2.Agent{Workspace: t.Workspace})

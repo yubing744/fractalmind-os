@@ -6,7 +6,7 @@ FractalBot's configuration has four concepts:
 | --- | --- | --- |
 | Channel | `channels.<type>.<name>` | How to reach a chat platform: credentials, allowlists, polling |
 | Agent | `agents.<name>` | Who receives: a workspace, one runtime, the channels it is bound to |
-| Runtime | `runtimes` | How to deliver: tuning for Claude Desktop, Codex App and agent-manager |
+| Runtime | `runtimes` | How to deliver: tuning for Claude Desktop, Codex App, DeepSeek Harness and agent-manager |
 | Schedule | `schedules.jobs.<id>` | When to wake an agent, and with what prompt |
 
 The file holds no secret values and no runtime data paths. Secrets are `secret:<name>` references resolved on each machine. Inboxes, deduplication records, polling offsets and schedule state live under `dataDir` at fixed paths.
@@ -127,9 +127,9 @@ When several agents share a channel, an agent replies with `fractalbot message s
 | Field | Notes |
 | --- | --- |
 | `workspace` | Required, and must exist. `promptFile` paths and `fractalbot relay` are resolved against it. |
-| `runtime` | `claudeDesktop`, `codexApp` or `agentManager`. |
+| `runtime` | `claudeDesktop`, `codexApp`, `deepseekHarness` or `agentManager`. |
 | `channels` | Channel instances as `type.name`. An agent with no channels only runs schedules. |
-| `session` | `codexApp`: the Codex thread ID (required). `agentManager`: the agent-manager agent (default `main`). `claudeDesktop`: none. |
+| `session` | `codexApp`: the Codex thread ID (required). `agentManager`: the agent-manager agent (default `main`). `claudeDesktop` and `deepseekHarness`: none. |
 
 An agent has one runtime. To send one workspace's messages to one runtime and its schedules to another, configure two agents with the same workspace (for example `xiaoyi` with `runtime: codexApp` and channels, and `xiaoyi-desktop` with `runtime: claudeDesktop` and only schedules).
 
@@ -139,9 +139,21 @@ An agent has one runtime. To send one workspace's messages to one runtime and it
 | --- | --- | --- |
 | `claudeDesktop` | Writes the agent's inbox `<dataDir>/inbox/<agent>/`. `fractalbot relay`, started inside the agent's Claude Desktop session, moves each envelope into that session. | `deliveryTimeoutSeconds` |
 | `codexApp` | Runs `codex queue --thread <session>` in the workspace. Codex's own queue holds the message until the thread is free. | `codex` (executable, default `codex` on PATH), `deliveryTimeoutSeconds` |
+| `deepseekHarness` | Submits to the currently active DeepSeek Harness Desktop composer through an explicitly enabled loopback CDP endpoint. It has no durable queue, so the app and endpoint must be available. | `cdpEndpoint` (required, loopback HTTP URL), `targetSelector`, `deliveryTimeoutSeconds` |
 | `agentManager` | Runs the workspace's agent-manager `assign <session>`. | `script` (default `.claude/skills/agent-manager/scripts/main.py`), `assignTimeoutSeconds`, `startIfMissing` |
 
 The inbox format is specified in [inbox-protocol.md](inbox-protocol.md).
+
+To use `deepseekHarness`, fully quit DeepSeek Harness Desktop and launch it
+with a local debugging port, for example:
+
+```sh
+open -na "DeepSeek Harness" --args --remote-debugging-port=9224
+```
+
+Then configure `runtimes.deepseekHarness.cdpEndpoint` as
+`http://127.0.0.1:9224`. The runtime deliberately requires a loopback endpoint
+and only accepts the app's `dsh-app://app` page before it writes to a composer.
 
 Start the relay from a Claude Desktop session's start hook:
 
@@ -241,7 +253,7 @@ It exits 1 on any problem. It checks that:
 - shared channels have a valid `default`;
 - workspaces and prompt files exist;
 - cron expressions and time zones parse;
-- the channels and runtimes work on this OS (iMessage needs macOS; `claudeDesktop` and `codexApp` need macOS or Windows; `agentManager` needs tmux, so it does not run on Windows outside WSL);
+- the channels and runtimes work on this OS (iMessage needs macOS; `claudeDesktop`, `codexApp` and `deepseekHarness` need macOS or Windows; `agentManager` needs tmux, so it does not run on Windows outside WSL);
 - the `codex` and `tmux` executables exist;
 - every secret is set.
 

@@ -114,6 +114,8 @@ func (r Report) Write(w io.Writer) {
 			fmt.Fprintf(w, "    inbox %s\n", paths.Inbox(name))
 		case RuntimeCodexApp:
 			fmt.Fprintf(w, "    Codex thread %s\n", a.Session)
+		case RuntimeDeepSeekHarness:
+			fmt.Fprintf(w, "    DeepSeek Harness CDP %s\n", cfg.Runtimes.DeepSeekHarness.CDPEndpoint)
 		case RuntimeAgentManager:
 			fmt.Fprintf(w, "    agent-manager agent %s via %s\n", a.Session, cfg.AgentManagerScript(a))
 		}

@@ -27,6 +27,7 @@ Each agent is a workspace with one runtime and the channels it receives. A chann
 | --- | --- | --- |
 | `claudeDesktop` | Claude Desktop | A durable per-agent inbox, moved into the session by `fractalbot relay` over Claude's authenticated messaging socket. |
 | `codexApp` | Codex App | `codex queue` into the agent's pinned thread; Codex's queue holds the message until the thread is free. |
+| `deepseekHarness` | DeepSeek Harness Desktop | Submits through an explicitly enabled loopback CDP endpoint to the active Harness composer. |
 | `agentManager` | agent-manager (tmux) | `assign` to the agent-manager agent; can start a stopped agent and run its native heartbeat lifecycle. |
 
 Secrets are never stored in the configuration. Values live in the OS credential store, owner-only files, environment variables or a password manager, and are masked in every log line.

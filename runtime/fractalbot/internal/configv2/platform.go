@@ -117,7 +117,7 @@ func (p Platform) channelSupport(kind string) string {
 
 func (p Platform) runtimeSupport(name string) string {
 	switch name {
-	case RuntimeClaudeDesktop, RuntimeCodexApp:
+	case RuntimeClaudeDesktop, RuntimeCodexApp, RuntimeDeepSeekHarness:
 		if p.GOOS != "darwin" && p.GOOS != "windows" {
 			return name + " needs the desktop app, which runs on macOS and Windows"
 		}

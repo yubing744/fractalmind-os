@@ -39,6 +39,10 @@ channels:
 # Only needed when `codex` is not on the gateway's PATH.
 # runtimes:
 #   codexApp: {codex: ~/.local/bin/codex}
+#   # Start DeepSeek Harness Desktop yourself with --remote-debugging-port=9224.
+#   # This runtime submits to the currently active Harness composer over the
+#   # loopback-only DevTools endpoint; Harness has no native durable queue.
+#   deepseekHarness: {cdpEndpoint: http://127.0.0.1:9224}
 
 # ── Agents: who receives messages and schedules ─────────────
 agents:
@@ -52,6 +56,11 @@ agents:
     workspace: ~/workspace/researcher
     runtime: claudeDesktop
     channels: [telegram.main]
+
+  # harness:                    # the active DeepSeek Harness Desktop composer
+  #   workspace: ~/workspace/harness
+  #   runtime: deepseekHarness
+  #   channels: [telegram.main]
 
   # builder:                    # a tmux agent run by agent-manager
   #   workspace: ~/workspace/builder

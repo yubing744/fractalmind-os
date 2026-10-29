@@ -124,7 +124,7 @@ channels:
 agents:
   dev:
     workspace: /path/to/your/workspace   # 替换为你的工作仓库路径
-    runtime: agentManager                # 也可以是 claudeDesktop 或 codexApp
+    runtime: agentManager                # 也可以是 claudeDesktop、codexApp 或 deepseekHarness
     session: dev                         # agent-manager 里的 Agent 名
     channels: [slack.main]
 EOF

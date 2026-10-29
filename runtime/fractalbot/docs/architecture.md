@@ -63,7 +63,7 @@ flowchart LR
 | Channel Manager | Starts each configured channel instance with its resolved secrets, isolates their lifecycles, and sends outbound messages through per-channel workers. An instance missing a secret stays stopped and is reported. |
 | Message Bus | Buffers inbound and outbound work while keeping the channels' synchronous reply contract. |
 | `internal/router` | Identifies the channel instance and picks the agent (mention, pinned chat, `/use`, default). It also answers `/use` and `/who`, builds the prompt and delivers it. It handles schedule wakeups the same way, and records each agent's last delivery. |
-| `pkg/localruntime` | One adapter contract (`Deliver`, `Presence`, `Capabilities`) for Claude Desktop, Codex App and agent-manager. It also owns the inbox protocol and the relay. It is an application-layer library with no FractalBot configuration dependency. |
+| `pkg/localruntime` | One adapter contract (`Deliver`, `Presence`, `Capabilities`) for Claude Desktop, Codex App, DeepSeek Harness and agent-manager. It also owns the inbox protocol and the relay. It is an application-layer library with no FractalBot configuration dependency. |
 | Scheduler (`internal/heartbeat`) | Computes cron runs per time zone, persists backoff levels and outcomes, and dispatches wakeups to agents. |
 | Gateway server | `/health`, `/status` (by agent and channel), `/ws`, the message send API and the schedule APIs, all on loopback by default. |
 
