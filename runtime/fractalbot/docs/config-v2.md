@@ -129,7 +129,7 @@ When several agents share a channel, an agent replies with `fractalbot message s
 | `workspace` | Required, and must exist. `promptFile` paths and `fractalbot relay` are resolved against it. |
 | `runtime` | `claudeDesktop`, `codexApp`, `deepseekHarness` or `agentManager`. |
 | `channels` | Channel instances as `type.name`. An agent with no channels only runs schedules. |
-| `session` | `codexApp`: the Codex thread ID (required). `agentManager`: the agent-manager agent (default `main`). `claudeDesktop` and `deepseekHarness`: none. |
+| `session` | `codexApp`: the Codex thread ID (required). `deepseekHarness`: the DSH session ID (`session-<UUID>`, required). `agentManager`: the agent-manager agent (default `main`). `claudeDesktop`: none. |
 
 An agent has one runtime. To send one workspace's messages to one runtime and its schedules to another, configure two agents with the same workspace (for example `xiaoyi` with `runtime: codexApp` and channels, and `xiaoyi-desktop` with `runtime: claudeDesktop` and only schedules).
 
@@ -139,7 +139,7 @@ An agent has one runtime. To send one workspace's messages to one runtime and it
 | --- | --- | --- |
 | `claudeDesktop` | Writes the agent's inbox `<dataDir>/inbox/<agent>/`. `fractalbot relay`, started inside the agent's Claude Desktop session, moves each envelope into that session. | `deliveryTimeoutSeconds` |
 | `codexApp` | Runs `codex queue --thread <session>` in the workspace. Codex's own queue holds the message until the thread is free. | `codex` (executable, default `codex` on PATH), `deliveryTimeoutSeconds` |
-| `deepseekHarness` | Submits to the currently active DeepSeek Harness Desktop composer through an explicitly enabled loopback CDP endpoint. It has no durable queue, so the app and endpoint must be available. | `cdpEndpoint` (required, loopback HTTP URL), `targetSelector`, `deliveryTimeoutSeconds` |
+| `deepseekHarness` | Selects the configured DSH session under the configured workspace, verifies the selection, then submits through an explicitly enabled loopback CDP endpoint. It has no durable queue, so the app and endpoint must be available. | `cdpEndpoint` (required, loopback HTTP URL), `targetSelector`, `deliveryTimeoutSeconds` |
 | `agentManager` | Runs the workspace's agent-manager `assign <session>`. | `script` (default `.claude/skills/agent-manager/scripts/main.py`), `assignTimeoutSeconds`, `startIfMissing` |
 
 The inbox format is specified in [inbox-protocol.md](inbox-protocol.md).
@@ -148,12 +148,15 @@ To use `deepseekHarness`, fully quit DeepSeek Harness Desktop and launch it
 with a local debugging port, for example:
 
 ```sh
-open -na "DeepSeek Harness" --args --remote-debugging-port=9224
+open -a "DeepSeek Harness" --args --remote-debugging-port=9224
 ```
 
 Then configure `runtimes.deepseekHarness.cdpEndpoint` as
-`http://127.0.0.1:9224`. The runtime deliberately requires a loopback endpoint
-and only accepts the app's `dsh-app://app` page before it writes to a composer.
+`http://127.0.0.1:9224`, and set each Harness agent's `session` to its stable
+DSH session ID (`session-<UUID>`). The runtime deliberately requires a
+loopback endpoint, only accepts the app's `dsh-app://app` page, and verifies
+that the selected session belongs to the agent's configured workspace before it
+writes to a composer.
 
 Start the relay from a Claude Desktop session's start hook:
 

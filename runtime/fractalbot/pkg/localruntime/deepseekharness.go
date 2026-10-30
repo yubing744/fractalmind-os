@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 
 const defaultDeepSeekHarnessDeliveryTimeout = 20 * time.Second
 
-// DeepSeekHarness sends prompts to the active DeepSeek Harness Desktop page
+// DeepSeekHarness sends prompts to one named DeepSeek Harness Desktop session
 // through the app's explicitly enabled local Chromium DevTools endpoint. It
 // deliberately has no durable queue: DeepSeek Harness does not expose one.
 type DeepSeekHarness struct {
@@ -34,27 +35,35 @@ func (DeepSeekHarness) Capabilities() Capabilities {
 	return Capabilities{WakesIdle: true, PresenceKnown: true}
 }
 
-func (d DeepSeekHarness) Deliver(ctx context.Context, _ Target, req Request) Result {
+func (d DeepSeekHarness) Deliver(ctx context.Context, target Target, req Request) Result {
 	if req.Mode != Assign {
 		return failed(req, errors.New("deepseekHarness supports assign only"))
 	}
 	if strings.TrimSpace(req.Prompt) == "" {
 		return failed(req, errors.New("prompt is empty"))
 	}
+	sessionID := strings.TrimSpace(target.Session)
+	if sessionID == "" {
+		return failed(req, errors.New("deepseekHarness target session is required"))
+	}
+	workspace := filepath.Base(filepath.Clean(strings.TrimSpace(target.Workspace)))
+	if workspace == "." || workspace == string(filepath.Separator) || workspace == "" {
+		return failed(req, errors.New("deepseekHarness target workspace is required"))
+	}
 	ctx, cancel := context.WithTimeout(ctx, d.deliveryTimeout())
 	defer cancel()
-	target, err := d.target(ctx)
+	cdpTarget, err := d.target(ctx)
 	if err != nil {
 		return failed(req, err)
 	}
-	value, err := d.evaluate(ctx, target.WebSocketDebuggerURL, deepSeekHarnessDeliveryScript(req.Prompt))
+	value, err := d.evaluate(ctx, cdpTarget.WebSocketDebuggerURL, deepSeekHarnessDeliveryScript(sessionID, workspace, req.Prompt))
 	if err != nil {
 		return failed(req, err)
 	}
-	if err := validateDeepSeekHarnessDelivery(value); err != nil {
+	if err := validateDeepSeekHarnessDelivery(value, sessionID, workspace); err != nil {
 		return failed(req, err)
 	}
-	return Result{Status: Delivered, EnvelopeID: req.Envelope.ID, Location: "DeepSeek Harness active composer"}
+	return Result{Status: Delivered, EnvelopeID: req.Envelope.ID, Location: fmt.Sprintf("DeepSeek Harness session %s in workspace %s", sessionID, workspace)}
 }
 
 // Presence reports whether an eligible DeepSeek Harness page is currently
@@ -196,7 +205,7 @@ func (d DeepSeekHarness) evaluate(ctx context.Context, endpoint, expression stri
 	}
 }
 
-func validateDeepSeekHarnessDelivery(value any) error {
+func validateDeepSeekHarnessDelivery(value any, sessionID, workspace string) error {
 	result, ok := value.(map[string]any)
 	if !ok {
 		return fmt.Errorf("DeepSeek Harness delivery returned %T, expected object", value)
@@ -206,6 +215,12 @@ func validateDeepSeekHarnessDelivery(value any) error {
 	}
 	if submitted, ok := result["submitted"].(bool); !ok || !submitted {
 		return fmt.Errorf("DeepSeek Harness delivery did not submit the prompt: %s", cdpDeliveryErrorDetail(result))
+	}
+	if selected, ok := result["session"].(string); !ok || selected != sessionID {
+		return fmt.Errorf("DeepSeek Harness delivery targeted an unexpected session: %s", cdpDeliveryErrorDetail(result))
+	}
+	if selected, ok := result["workspace"].(string); !ok || selected != workspace {
+		return fmt.Errorf("DeepSeek Harness delivery targeted an unexpected workspace: %s", cdpDeliveryErrorDetail(result))
 	}
 	return nil
 }
@@ -217,9 +232,13 @@ func cdpDeliveryErrorDetail(result map[string]any) string {
 	return "unknown error"
 }
 
-func deepSeekHarnessDeliveryScript(prompt string) string {
-	encoded, _ := json.Marshal(prompt)
+func deepSeekHarnessDeliveryScript(sessionID, workspace, prompt string) string {
+	encodedSession, _ := json.Marshal(sessionID)
+	encodedWorkspace, _ := json.Marshal(workspace)
+	encodedPrompt, _ := json.Marshal(prompt)
 	return fmt.Sprintf(`(async () => {
+  const targetSession = %s;
+  const targetWorkspace = %s;
   const text = %s;
   const visible = (element) => {
     if (!element) return false;
@@ -228,6 +247,49 @@ func deepSeekHarnessDeliveryScript(prompt string) string {
     return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
   };
   const editable = (element) => element && (element.isContentEditable || element.getAttribute("contenteditable") === "true" || element.tagName === "TEXTAREA" || element.getAttribute("role") === "textbox");
+
+  // DSH renders its workspace tree in flat order. A session must immediately
+  // follow its workspace until the next workspace row; checking that parent
+  // prevents a same-titled session in another workspace from receiving input.
+  const rows = () => Array.from(document.querySelectorAll("[data-row-key]")).filter(visible);
+  const key = "session:" + targetSession;
+  const sessionRow = () => rows().find((row) => row.getAttribute("data-row-key") === key);
+  const targetWorkspaceRow = () => rows().find((row) => (row.getAttribute("data-row-key") || "").startsWith("workspace:") && row.innerText.trim() === targetWorkspace);
+  const workspaceFor = (row) => {
+    const items = rows();
+    const index = items.indexOf(row);
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      if ((items[cursor].getAttribute("data-row-key") || "").startsWith("workspace:")) return items[cursor];
+    }
+    return null;
+  };
+  let selected = sessionRow();
+  if (!selected) {
+    const workspaceRow = targetWorkspaceRow();
+    if (!workspaceRow) return { ok: false, submitted: false, error: "configured DeepSeek Harness workspace is not visible" };
+    if (workspaceRow.getAttribute("aria-expanded") !== "true") workspaceRow.click();
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      selected = sessionRow();
+      if (selected) break;
+    }
+  }
+  if (!selected) return { ok: false, submitted: false, error: "target DeepSeek Harness session is not visible" };
+  const workspaceRow = workspaceFor(selected);
+  if (!workspaceRow || workspaceRow.innerText.trim() !== targetWorkspace) {
+    return { ok: false, submitted: false, error: "target session is not in the configured DeepSeek Harness workspace" };
+  }
+  if (selected.getAttribute("aria-selected") !== "true") selected.click();
+  const deadline = Date.now() + 2000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    selected = sessionRow();
+    if (selected && selected.getAttribute("aria-selected") === "true") break;
+  }
+  if (!selected || selected.getAttribute("aria-selected") !== "true") {
+    return { ok: false, submitted: false, error: "DeepSeek Harness did not activate the target session" };
+  }
   const inputs = Array.from(document.querySelectorAll("textarea,[contenteditable=true],[role=textbox],input[type=text]")).filter((element) => visible(element) && editable(element));
   const input = inputs[0];
   if (!input) return { ok: false, submitted: false, error: "no visible DeepSeek Harness composer found" };
@@ -252,6 +314,6 @@ func deepSeekHarnessDeliveryScript(prompt string) string {
   });
   if (!button) return { ok: false, submitted: false, error: "no enabled DeepSeek Harness send button found" };
   button.click();
-  return { ok: true, submitted: true, submitMethod: "button" };
-})()`, string(encoded))
+  return { ok: true, submitted: true, submitMethod: "button", session: targetSession, workspace: targetWorkspace };
+})()`, string(encodedSession), string(encodedWorkspace), string(encodedPrompt))
 }

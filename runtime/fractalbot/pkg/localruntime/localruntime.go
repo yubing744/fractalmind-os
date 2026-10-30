@@ -70,8 +70,9 @@ type Target struct {
 	Agent string
 	// Workspace is the agent's working directory.
 	Workspace string
-	// Session is the receiver inside the runtime: the agent-manager agent or
-	// the Codex thread ID. Claude Desktop agents have none.
+	// Session is the receiver inside the runtime: the agent-manager agent, the
+	// Codex thread ID, or the DeepSeek Harness session ID. Claude Desktop agents
+	// have none.
 	Session string
 	// Inbox is the agent's inbox directory, for runtimes that use one.
 	Inbox string

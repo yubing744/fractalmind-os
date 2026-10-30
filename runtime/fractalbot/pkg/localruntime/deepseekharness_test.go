@@ -32,10 +32,10 @@ func TestDeepSeekHarnessDeliversToDSHAppTarget(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		if request.Method != "Runtime.evaluate" || !strings.Contains(request.Params.Expression, `const text = "wake up"`) {
+		if request.Method != "Runtime.evaluate" || !strings.Contains(request.Params.Expression, `const text = "wake up"`) || !strings.Contains(request.Params.Expression, `const targetSession = "session-12345678-1234-1234-1234-123456789abc"`) || !strings.Contains(request.Params.Expression, `const targetWorkspace = "burry-claw"`) {
 			t.Errorf("unexpected CDP request: %#v", request)
 		}
-		_ = conn.WriteJSON(map[string]any{"id": request.ID, "result": map[string]any{"result": map[string]any{"value": map[string]any{"ok": true, "submitted": true}}}})
+		_ = conn.WriteJSON(map[string]any{"id": request.ID, "result": map[string]any{"result": map[string]any{"value": map[string]any{"ok": true, "submitted": true, "session": "session-12345678-1234-1234-1234-123456789abc", "workspace": "burry-claw"}}}})
 	}))
 	defer ws.Close()
 	wsURL := "ws" + strings.TrimPrefix(ws.URL, "http")
@@ -50,11 +50,12 @@ func TestDeepSeekHarnessDeliversToDSHAppTarget(t *testing.T) {
 	defer cdp.Close()
 
 	runtime := DeepSeekHarness{CDPEndpoint: cdp.URL, Timeout: time.Second}
-	result := runtime.Deliver(context.Background(), Target{}, request("wake up"))
-	if result.Status != Delivered || result.Err != nil || result.Location != "DeepSeek Harness active composer" {
+	target := Target{Workspace: "/Users/yubing/burry-claw", Session: "session-12345678-1234-1234-1234-123456789abc"}
+	result := runtime.Deliver(context.Background(), target, request("wake up"))
+	if result.Status != Delivered || result.Err != nil || result.Location != "DeepSeek Harness session session-12345678-1234-1234-1234-123456789abc in workspace burry-claw" {
 		t.Fatalf("deliver: %+v", result)
 	}
-	if runtime.Presence(context.Background(), Target{}) != Online {
+	if runtime.Presence(context.Background(), target) != Online {
 		t.Fatal("expected online DeepSeek Harness target")
 	}
 }
@@ -66,7 +67,7 @@ func TestDeepSeekHarnessRejectsNonHarnessTarget(t *testing.T) {
 	defer cdp.Close()
 
 	runtime := DeepSeekHarness{CDPEndpoint: cdp.URL}
-	result := runtime.Deliver(context.Background(), Target{}, request("do not leak this prompt"))
+	result := runtime.Deliver(context.Background(), Target{Workspace: "/Users/yubing/burry-claw", Session: "session-12345678-1234-1234-1234-123456789abc"}, request("do not leak this prompt"))
 	if result.Status != Failed || result.Err == nil || !strings.Contains(result.Err.Error(), "no eligible app target") {
 		t.Fatalf("deliver: %+v", result)
 	}

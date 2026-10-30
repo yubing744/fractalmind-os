@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,62}$`)
-	uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	namePattern       = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,62}$`)
+	uuidPattern       = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	dshSessionPattern = regexp.MustCompile(`^session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 )
 
 const (
@@ -159,8 +160,8 @@ func (c *Config) validateAgents(ps *problems, p Platform) map[string][]string {
 				ps.add("%s.session: claudeDesktop agents have no session", prefix)
 			}
 		case RuntimeDeepSeekHarness:
-			if a.Session != "" {
-				ps.add("%s.session: deepseekHarness delivers to the active app composer and has no session", prefix)
+			if !dshSessionPattern.MatchString(a.Session) {
+				ps.add("%s.session: deepseekHarness agents need the DeepSeek Harness session ID (session-<lower-case UUID>)", prefix)
 			}
 			if err := validateDeepSeekHarnessEndpoint(c.Runtimes.DeepSeekHarness.CDPEndpoint); err != nil {
 				ps.add("runtimes.deepseekHarness.cdpEndpoint: %v", err)
