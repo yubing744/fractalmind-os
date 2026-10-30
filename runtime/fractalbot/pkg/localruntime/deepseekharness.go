@@ -290,9 +290,32 @@ func deepSeekHarnessDeliveryScript(sessionID, workspace, prompt string) string {
   if (!selected || selected.getAttribute("aria-selected") !== "true") {
     return { ok: false, submitted: false, error: "DeepSeek Harness did not activate the target session" };
   }
-  const inputs = Array.from(document.querySelectorAll("textarea,[contenteditable=true],[role=textbox],input[type=text]")).filter((element) => visible(element) && editable(element));
-  const input = inputs[0];
+
+  const composer = () => Array.from(document.querySelectorAll("textarea,[data-composer-input],[contenteditable=true],[role=textbox],input[type=text]")).find((element) => visible(element) && editable(element));
+  const composerText = (element) => element && (element.isContentEditable || element.getAttribute("contenteditable") === "true") ? element.innerText.trim() : String(element?.value || "").trim();
+  const sendButton = () => Array.from(document.querySelectorAll("button")).filter(visible).find((candidate) => {
+    const label = [candidate.getAttribute("aria-label"), candidate.getAttribute("title"), candidate.getAttribute("data-testid"), candidate.innerText].filter(Boolean).join(" ").trim();
+    return /^(send( message)?|submit|发送|提交)$/i.test(label) || candidate.type === "submit";
+  });
+  const waitUntil = async (predicate, deadline) => {
+    while (Date.now() < deadline) {
+      const value = predicate();
+      if (value) return value;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    return null;
+  };
+
+  const readyDeadline = Date.now() + 8000;
+  let input = composer();
+  let button = await waitUntil(() => {
+    input = composer();
+    return input && sendButton();
+  }, readyDeadline);
   if (!input) return { ok: false, submitted: false, error: "no visible DeepSeek Harness composer found" };
+  if (!button) return { ok: false, submitted: false, error: "target DeepSeek Harness session is still generating" };
+  if (composerText(input) !== "") return { ok: false, submitted: false, error: "target DeepSeek Harness composer already has a draft" };
+
   input.focus();
   if (input.isContentEditable || input.getAttribute("contenteditable") === "true") {
     const range = document.createRange();
@@ -307,13 +330,20 @@ func deepSeekHarnessDeliveryScript(sessionID, workspace, prompt string) string {
   }
   input.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
-  const button = Array.from(document.querySelectorAll("button")).filter(visible).find((candidate) => {
-    if (candidate.disabled || candidate.getAttribute("aria-disabled") === "true") return false;
-    const label = [candidate.getAttribute("aria-label"), candidate.getAttribute("title"), candidate.getAttribute("data-testid"), candidate.innerText, candidate.type].filter(Boolean).join(" ");
-    return /(^|\\s)(send|submit|run)(\\s|$)|发送|提交|运行/i.test(label) || candidate.type === "submit";
-  });
-  if (!button) return { ok: false, submitted: false, error: "no enabled DeepSeek Harness send button found" };
+
+  button = await waitUntil(() => {
+    const candidate = sendButton();
+    if (!candidate || candidate.disabled || candidate.getAttribute("aria-disabled") === "true") return null;
+    return candidate;
+  }, Date.now() + 3000);
+  if (!button) return { ok: false, submitted: false, error: "DeepSeek Harness did not enable its send button after composing the prompt" };
   button.click();
+  const accepted = await waitUntil(() => {
+    const current = composer();
+    const stop = Array.from(document.querySelectorAll("button")).filter(visible).some((candidate) => /^(stop|stop generating|停止|停止生成)$/i.test((candidate.getAttribute("aria-label") || candidate.innerText || "").trim()));
+    return stop || composerText(current) === "";
+  }, Date.now() + 3000);
+  if (!accepted) return { ok: false, submitted: false, error: "DeepSeek Harness did not confirm prompt submission" };
   return { ok: true, submitted: true, submitMethod: "button", session: targetSession, workspace: targetWorkspace };
 })()`, string(encodedSession), string(encodedWorkspace), string(encodedPrompt))
 }

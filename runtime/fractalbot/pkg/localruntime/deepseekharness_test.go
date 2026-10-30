@@ -32,7 +32,7 @@ func TestDeepSeekHarnessDeliversToDSHAppTarget(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		if request.Method != "Runtime.evaluate" || !strings.Contains(request.Params.Expression, `const text = "wake up"`) || !strings.Contains(request.Params.Expression, `const targetSession = "session-12345678-1234-1234-1234-123456789abc"`) || !strings.Contains(request.Params.Expression, `const targetWorkspace = "burry-claw"`) {
+		if request.Method != "Runtime.evaluate" || !strings.Contains(request.Params.Expression, `const text = "wake up"`) || !strings.Contains(request.Params.Expression, `const targetSession = "session-12345678-1234-1234-1234-123456789abc"`) || !strings.Contains(request.Params.Expression, `const targetWorkspace = "burry-claw"`) || !strings.Contains(request.Params.Expression, `target DeepSeek Harness session is still generating`) || strings.Contains(request.Params.Expression, `send|submit|run`) {
 			t.Errorf("unexpected CDP request: %#v", request)
 		}
 		_ = conn.WriteJSON(map[string]any{"id": request.ID, "result": map[string]any{"result": map[string]any{"value": map[string]any{"ok": true, "submitted": true, "session": "session-12345678-1234-1234-1234-123456789abc", "workspace": "burry-claw"}}}})
